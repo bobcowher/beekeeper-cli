@@ -185,10 +185,26 @@ int main(int argc, char* argv[]) {
                 auto& metrics = tb_res["data"]["metrics"];
                 for (auto& el : metrics.items()) {
                     auto& m = el.value();
-                    std::cout << "- " << std::left << std::setw(15) << el.key() << ": "
-                              << m["trend"].get<std::string>() << " (" 
-                              << std::fixed << std::setprecision(1) << m["improvement_percent"].get<double>() << "% | "
-                              << "Best: " << m["best_value"].get<double>() << ")\n";
+                    std::string trend = m["trend"].get<std::string>();
+                    std::string recent_trend = m.value("recent_trend", trend);
+                    double improvement = m["improvement_percent"].get<double>();
+                    double best_val = m["best_value"].get<double>();
+                    double peak_val = m.value("peak_value", best_val);
+                    int peak_step = m.value("peak_step", 0);
+                    double peak_reversal = m.value("peak_reversal_pct", 0.0);
+
+                    std::cout << "- " << std::left << std::setw(20) << el.key() << ": "
+                              << trend << " ("
+                              << std::fixed << std::setprecision(1) << improvement << "% | "
+                              << "Best: " << std::setprecision(4) << best_val << ")\n";
+                    if (recent_trend != trend) {
+                        std::cout << "  Recent trend: " << recent_trend << "\n";
+                    }
+                    if (peak_reversal > 0.01) {
+                        std::cout << "  Peak: " << std::setprecision(4) << peak_val
+                                  << " at step " << peak_step
+                                  << " | Reversal: " << std::setprecision(1) << peak_reversal << "%\n";
+                    }
                     if (m["converged"].get<bool>()) {
                         std::cout << "  [CONVERGED at step " << m["convergence_step"] << "]\n";
                     }
