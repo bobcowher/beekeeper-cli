@@ -4,8 +4,8 @@ TARGET = beekeeper
 
 all: $(TARGET)
 
-$(TARGET): main.cpp
-	$(CC) $(CFLAGS) main.cpp -o $(TARGET)
+$(TARGET): beekeeper.cpp
+	$(CC) $(CFLAGS) beekeeper.cpp -o $(TARGET)
 
 clean:
 	rm -f $(TARGET)
