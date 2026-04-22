@@ -214,14 +214,53 @@ int main(int argc, char* argv[]) {
             }
 
             if (log_res["success"]) {
+                auto& d = log_res["data"];
+                int ep_start = d["episode_range"][0].get<int>();
+                int ep_end   = d["episode_range"][1].get<int>();
+                int total    = d["total_episodes"].get<int>();
+                std::string trend = d.value("trend", "unknown");
+
                 std::cout << "\nEpisode Analysis (Logs):\n";
-                auto& trends = log_res["data"]["trends"];
-                for (auto& el : trends.items()) {
-                    auto& t = el.value();
-                    std::cout << "- " << std::left << std::setw(15) << el.key() << ": "
-                              << t["direction"].get<std::string>() << " (Avg: " 
-                              << std::fixed << std::setprecision(2) << t["current_avg"].get<double>() << ")\n";
+                std::cout << "  Episodes: " << ep_start << "-" << ep_end
+                          << " (" << total << " total) | Trend: " << trend << "\n";
+
+                auto& ov = d["overall"];
+                std::cout << std::fixed << std::setprecision(2);
+                std::cout << "  Overall:  avg " << ov["avg_reward"].get<double>()
+                          << " | max " << ov["max_reward"].get<double>()
+                          << " | min " << ov["min_reward"].get<double>() << "\n";
+
+                if (d.contains("recent")) {
+                    auto& r = d["recent"];
+                    std::cout << "  Recent (last " << r["count"].get<int>() << "): "
+                              << "avg " << r["avg_reward"].get<double>()
+                              << " | max " << r["max_reward"].get<double>()
+                              << " | min " << r["min_reward"].get<double>() << "\n";
                 }
+
+                if (d.contains("quartiles") && d["quartiles"].is_array()) {
+                    std::cout << "\n  Quartile progression:\n";
+                    for (auto& q : d["quartiles"]) {
+                        int qn = q["quartile"].get<int>();
+                        int qs = q["episode_range"][0].get<int>();
+                        int qe = q["episode_range"][1].get<int>();
+                        std::cout << "  Q" << qn << " (ep " << qs << "-" << qe << "): "
+                                  << "avg " << q["avg_reward"].get<double>()
+                                  << " | max " << q["max_reward"].get<double>()
+                                  << " | min " << q["min_reward"].get<double>() << "\n";
+                    }
+                }
+
+                if (d.contains("latest_episode")) {
+                    auto& le = d["latest_episode"];
+                    std::cout << "  Latest ep " << le["episode"].get<int>()
+                              << ": reward " << le["reward"].get<double>()
+                              << " | steps " << le["steps"].get<int>()
+                              << " | epsilon " << le["epsilon"].get<double>() << "\n";
+                }
+            } else {
+                std::cout << "\nEpisode Analysis (Logs): "
+                          << (log_res.contains("error") ? log_res["error"]["message"].get<std::string>() : "No data") << "\n";
             }
         }
         else {
