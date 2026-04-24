@@ -39,11 +39,11 @@ public:
         return handle_response(res);
     }
 
-    json post(const std::string& path, const json& body = json::object()) {
+    json post(const std::string& path, const json& body = json::object(), bool slow_ok = false) {
         httplib::Client cli(base_url_, port_);
         httplib::Headers headers = { {"X-API-Key", api_key_} };
         auto res = cli.Post(path.c_str(), headers, body.dump(), "application/json");
-        return handle_response(res);
+        return handle_response(res, slow_ok);
     }
 
 private:
@@ -52,11 +52,16 @@ private:
     std::string base_url_;
     int port_;
 
-    json handle_response(httplib::Result& res) {
+    json handle_response(httplib::Result& res, bool slow_ok = false) {
         if (!res) {
-            return {{"success", false}, {"error", {{"message", "Connection failed"}}}};
+            auto err = res.error();
+            if (slow_ok && (err == httplib::Error::Read || err == httplib::Error::Write ||
+                            err == httplib::Error::ConnectionTimeout)) {
+                return {{"success", false}, {"error", {{"message", "no_response"}}}};
+            }
+            return {{"success", false}, {"error", {{"message", "Server unreachable at " + host_}}}};
         }
-        if (res->status != 200 && res->status != 201) {
+        if (res->status != 200 && res->status != 201 && res->status != 202) {
             try {
                 return json::parse(res->body);
             } catch (...) {
@@ -133,11 +138,18 @@ int main(int argc, char* argv[]) {
             std::string sub = argv[2];
             std::string name = argv[3];
             if (sub == "start") {
-                auto res = client.post("/api/v1/projects/" + name + "/training/start");
+                auto res = client.post("/api/v1/projects/" + name + "/training/start", json::object(), true);
                 if (res["success"]) {
-                    std::cout << "Training started. PID: " << res["data"]["pid"] << "\n";
+                    std::cout << "Training is starting. Pre-launch sequence (git sync, pip install) running in background.\n"
+                              << "Check status with: beekeeper training status " << name << "\n";
                 } else {
-                    std::cerr << "Error: " << (res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error") << "\n";
+                    std::string msg = res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error";
+                    if (msg == "no_response") {
+                        std::cerr << "Warning: No response from server — the pre-launch sequence may still be running.\n"
+                                  << "Check status with: beekeeper training status " << name << "\n";
+                        return 1;
+                    }
+                    std::cerr << "Error: " << msg << "\n";
                     return 1;
                 }
             } else if (sub == "stop") {
