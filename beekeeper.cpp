@@ -4,6 +4,8 @@
 #include <map>
 #include <cstdlib>
 #include <iomanip>
+#include <thread>
+#include <chrono>
 #include "version.h"
 #include "include/json.hpp"
 #include "include/httplib.h"
@@ -47,6 +49,13 @@ public:
         return handle_response(res, slow_ok);
     }
 
+    json del(const std::string& path) {
+        httplib::Client cli(base_url_, port_);
+        httplib::Headers headers = { {"X-API-Key", api_key_} };
+        auto res = cli.Delete(path.c_str(), headers);
+        return handle_response(res);
+    }
+
 private:
     std::string host_;
     std::string api_key_;
@@ -83,6 +92,8 @@ void print_usage() {
               << "Commands:\n"
               << "  projects list              List all projects\n"
               << "  projects info <name>       Show detailed project info\n"
+              << "  projects retry <name>      Retry failed project setup (polls until done)\n"
+              << "  projects delete <name>     Delete a project and all its data\n"
               << "  training start <name>      Start training for a project\n"
               << "  training stop <name>       Stop training for a project\n"
               << "  training status <name>     Get current training status\n"
@@ -142,6 +153,42 @@ int main(int argc, char* argv[]) {
                               << "Repo:    " << p["git_url"].get<std::string>() << " (" << p["branch"].get<std::string>() << ")\n"
                               << "Status:  " << p["train_status"].get<std::string>() << "\n"
                               << "Setup:   " << p["setup_status"].get<std::string>() << "\n";
+                } else {
+                    std::cerr << "Error: " << (res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error") << "\n";
+                    return 1;
+                }
+            } else if (sub == "retry" && argc >= 4) {
+                std::string name = argv[3];
+                auto res = client.post("/api/v1/projects/" + name + "/setup/retry");
+                if (!res["success"]) {
+                    std::cerr << "Error: " << (res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error") << "\n";
+                    return 1;
+                }
+                std::cout << "Setup retry started. Waiting for completion...\n";
+                // Poll until setup_status leaves the in-progress states
+                for (int i = 0; i < 120; ++i) {
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                    auto poll = client.get("/api/v1/projects/" + name);
+                    if (!poll["success"]) continue;
+                    std::string setup = poll["data"]["project"]["setup_status"].get<std::string>();
+                    std::cout << "  setup_status: " << setup << "\n";
+                    if (setup == "ready") {
+                        std::cout << "Setup complete.\n";
+                        return 0;
+                    }
+                    if (setup == "error") {
+                        std::string err = poll["data"]["project"].value("setup_error", "unknown error");
+                        std::cerr << "Setup failed: " << err << "\n";
+                        return 1;
+                    }
+                }
+                std::cerr << "Timed out waiting for setup to complete.\n";
+                return 1;
+            } else if (sub == "delete" && argc >= 4) {
+                std::string name = argv[3];
+                auto res = client.del("/api/v1/projects/" + name);
+                if (res["success"]) {
+                    std::cout << "Project '" << name << "' deleted.\n";
                 } else {
                     std::cerr << "Error: " << (res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error") << "\n";
                     return 1;
