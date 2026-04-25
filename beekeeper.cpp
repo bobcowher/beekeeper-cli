@@ -207,9 +207,9 @@ int main(int argc, char* argv[]) {
                 } else {
                     std::string msg = res.contains("error") ? res["error"]["message"].get<std::string>() : "Unknown error";
                     if (msg == "no_response") {
-                        std::cerr << "Warning: No response from server — the pre-launch sequence may still be running.\n"
+                        std::cout << "Warning: No response from server — the pre-launch sequence is likely still running.\n"
                                   << "Check status with: beekeeper training status " << name << "\n";
-                        return 1;
+                        return 0;
                     }
                     std::cerr << "Error: " << msg << "\n";
                     return 1;
