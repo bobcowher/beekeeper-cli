@@ -4,6 +4,7 @@
 #include <map>
 #include <cstdlib>
 #include <iomanip>
+#include "version.h"
 #include "include/json.hpp"
 #include "include/httplib.h"
 
@@ -72,8 +73,12 @@ private:
     }
 };
 
+void print_version() {
+    std::cout << "beekeeper " << BEEKEEPER_VERSION << "\n";
+}
+
 void print_usage() {
-    std::cout << "Beekeeper CLI - Agent-optimized training management\n\n"
+    std::cout << "Beekeeper CLI " << BEEKEEPER_VERSION << " - Agent-optimized training management\n\n"
               << "Usage: beekeeper <command> [subcommand] [args]\n\n"
               << "Commands:\n"
               << "  projects list              List all projects\n"
@@ -92,6 +97,16 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         print_usage();
         return 1;
+    }
+
+    std::string first_arg = argv[1];
+    if (first_arg == "--version" || first_arg == "-v") {
+        print_version();
+        return 0;
+    }
+    if (first_arg == "--help" || first_arg == "-h") {
+        print_usage();
+        return 0;
     }
 
     const char* host_env = std::getenv("BEEKEEPER_HOST");
