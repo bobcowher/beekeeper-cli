@@ -92,6 +92,31 @@ void print_version() {
     std::cout << "beekeeper " << BEEKEEPER_VERSION << "\n";
 }
 
+void check_version(BeekeeperClient& client) {
+    std::cout << "Installed: beekeeper " << BEEKEEPER_VERSION << "\n";
+    auto res = client.get("/api/v1/cli/version");
+    if (!res["success"]) {
+        std::cout << "Server:    unreachable — cannot verify version\n";
+        return;
+    }
+    std::string server_ver = res["data"]["cli_version"].get<std::string>();
+    std::cout << "Server expects: " << server_ver << "\n";
+    if (server_ver == BEEKEEPER_VERSION) {
+        std::cout << "Status: UP TO DATE\n";
+    } else {
+        std::cout << "Status: UPDATE REQUIRED\n\n"
+                  << "Your CLI is out of sync with the server. New commands or fixes may be missing.\n"
+                  << "Update with:\n\n"
+                  << "  # Linux\n"
+                  << "  curl -L -o /usr/local/bin/beekeeper "
+                  << res["data"]["download_url"].get<std::string>()
+                  << " && chmod +x /usr/local/bin/beekeeper\n\n"
+                  << "  # Windows\n"
+                  << "  curl -L -o beekeeper.exe "
+                  << res["data"]["download_url_windows"].get<std::string>() << "\n";
+    }
+}
+
 void print_usage() {
     std::cout << "Beekeeper CLI " << BEEKEEPER_VERSION << " - Agent-optimized training management\n\n"
               << "Usage: beekeeper <command> [subcommand] [args]\n\n"
@@ -113,6 +138,7 @@ void print_usage() {
               << "  branch switch <name> <branch>         Switch to a different branch\n"
               << "  stats                                 System stats (GPU, CPU, RAM)\n"
               << "  busy                                  Check if any training is currently running\n"
+              << "  version                               Check CLI version against server\n"
               << "\nEnvironment Variables:\n"
               << "  BEEKEEPER_HOST             Server URL (default: http://localhost:5000)\n"
               << "  BEEKEEPER_API_KEY          Your API key (required when auth is enabled)\n";
@@ -137,6 +163,7 @@ int main(int argc, char* argv[]) {
     }
     if (first_arg == "--help" || first_arg == "-h") {
         print_usage();
+        std::cout << "\nRun 'beekeeper version' to check compatibility with the server.\n";
         return 0;
     }
 
@@ -443,6 +470,11 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cout << "\nEpisode Analysis (Logs): " << error_msg(log_res) << "\n";
             }
+        }
+
+        // --- version ---
+        else if (cmd == "version") {
+            check_version(client);
         }
 
         else {
