@@ -33,30 +33,26 @@ public:
 
     json get(const std::string& path) {
         httplib::Client cli(base_url_, port_);
-        httplib::Headers headers = {{"Authorization", "Bearer " + api_key_}};
-        auto res = cli.Get(path.c_str(), headers);
+        auto res = cli.Get(path.c_str(), make_headers());
         return handle_response(res);
     }
 
     json post(const std::string& path, const json& body = json::object(), bool slow_ok = false) {
         httplib::Client cli(base_url_, port_);
-        httplib::Headers headers = {{"Authorization", "Bearer " + api_key_}};
-        auto res = cli.Post(path.c_str(), headers, body.dump(), "application/json");
+        auto res = cli.Post(path.c_str(), make_headers(), body.dump(), "application/json");
         return handle_response(res, slow_ok);
     }
 
     json del(const std::string& path) {
         httplib::Client cli(base_url_, port_);
-        httplib::Headers headers = {{"Authorization", "Bearer " + api_key_}};
-        auto res = cli.Delete(path.c_str(), headers);
+        auto res = cli.Delete(path.c_str(), make_headers());
         return handle_response(res);
     }
 
     // Returns raw response body (for markdown/text endpoints)
     std::string raw_get(const std::string& path) {
         httplib::Client cli(base_url_, port_);
-        httplib::Headers headers = {{"Authorization", "Bearer " + api_key_}};
-        auto res = cli.Get(path.c_str(), headers);
+        auto res = cli.Get(path.c_str(), make_headers());
         if (!res) return "";
         if (res->status != 200) return "";
         return res->body;
@@ -67,6 +63,14 @@ private:
     std::string api_key_;
     std::string base_url_;
     int port_;
+
+    httplib::Headers make_headers() {
+        httplib::Headers h;
+        if (!api_key_.empty()) {
+            h.emplace("Authorization", "Bearer " + api_key_);
+        }
+        return h;
+    }
 
     json handle_response(httplib::Result& res, bool slow_ok = false) {
         if (!res) {
